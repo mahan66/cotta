@@ -97,17 +97,20 @@ class CoTTA(nn.Module):
         # Teacher Prediction
         anchor_prob = torch.nn.functional.softmax(self.model_anchor(x), dim=1).max(1)[0]
         standard_ema = self.model_ema(x)
-        # Augmentation-averaged Prediction
-        N = 32 
-        outputs_emas = []
-        for i in range(N):
-            outputs_  = self.model_ema(self.transform(x)).detach()
-            outputs_emas.append(outputs_)
-        # Threshold choice discussed in supplementary
-        if anchor_prob.mean(0)<self.ap:
-            outputs_ema = torch.stack(outputs_emas).mean(0)
-        else:
-            outputs_ema = standard_ema
+
+        # # Augmentation-averaged Prediction
+        # N = 32
+        # outputs_emas = []
+        # for i in range(N):
+        #     outputs_  = self.model_ema(self.transform(x)).detach()
+        #     outputs_emas.append(outputs_)
+        # # Threshold choice discussed in supplementary
+        # if anchor_prob.mean(0)<self.ap:
+        #     outputs_ema = torch.stack(outputs_emas).mean(0)
+        # else:
+        #     outputs_ema = standard_ema
+        outputs_ema = standard_ema
+
         # Student update
         loss = (softmax_entropy(outputs, outputs_ema)).mean(0) 
         loss.backward()
@@ -120,7 +123,9 @@ class CoTTA(nn.Module):
             for nm, m  in self.model.named_modules():
                 for npp, p in m.named_parameters():
                     if npp in ['weight', 'bias'] and p.requires_grad:
-                        mask = (torch.rand(p.shape)<self.rst).float().cuda() 
+                        mask = (torch.rand(p.shape)<self.rst).float().cuda()
+                        # mask = (torch.rand(p.shape)<self.rst).float()
+
                         with torch.no_grad():
                             p.data = self.model_state[f"{nm}.{npp}"] * mask + p * (1.-mask)
         return outputs_ema
